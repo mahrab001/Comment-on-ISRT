@@ -144,61 +144,6 @@ function createCommentElement(comment, isReply = false, parentId = null) {
   box.appendChild(reactionContainer);
 
   // ----- Reply Form -----
-  const replyForm = document.createElement("form");
-  replyForm.classList.add("reply-form");
-  replyForm.style.display = "none";
-
-  const replyInput = document.createElement("textarea");
-  replyInput.placeholder = "Write a reply...";
-  const replySubmit = document.createElement("button");
-  replySubmit.textContent = "Post Reply";
-
-  replyForm.appendChild(replyInput);
-  replyForm.appendChild(replySubmit);
-  box.appendChild(replyForm);
-
-  // Toggle reply form
-  replyBtn.addEventListener("click", (e) => {
-    e.preventDefault();
-    e.stopPropagation();
-    replyForm.style.display =
-      replyForm.style.display === "none" ? "block" : "none";
-  });
-
-  // Submit reply
-  replyForm.addEventListener("submit", (e) => {
-    e.preventDefault();
-    const replyText = replyInput.value.trim();
-    if (!replyText) return;
-
-    const reply = {
-      id: Date.now().toString(),
-      text: replyText,
-      timestamp: Date.now(),
-      replies: [],
-      reactions: {},
-    };
-
-    const repliesRef = ref(db, `comments/${comment.id}/replies`);
-    push(repliesRef, reply);
-
-    replyInput.value = "";
-    replyForm.style.display = "none";
-  });
-
-  // ----- Render replies recursively -----
-  if (comment.replies) {
-    const repliesDiv = document.createElement("div");
-    repliesDiv.classList.add("replies");
-
-    Object.entries(comment.replies).forEach(([replyId, reply]) => {
-      repliesDiv.appendChild(
-        createCommentElement({ id: replyId, ...reply }, true, comment.id)
-      );
-    });
-
-    box.appendChild(repliesDiv);
-  }
-
+ 
   return box;
 }
