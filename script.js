@@ -1,8 +1,8 @@
-// Import Firebase SDKs
+// Import Firebase SDKs (optional for now)
 import { initializeApp } from "https://www.gstatic.com/firebasejs/11.0.1/firebase-app.js";
-import { getDatabase, ref, push, onValue, update } from "https://www.gstatic.com/firebasejs/11.0.1/firebase-database.js";
+import { getDatabase } from "https://www.gstatic.com/firebasejs/11.0.1/firebase-database.js";
 
-// Firebase configuration
+// Firebase config (can stay unused for now)
 const firebaseConfig = {
   apiKey: "AIzaSyBi0DtNzX0niHbV4LtId7PaxLoD8Pphy6U",
   authDomain: "comment-on-isrt-8a634.firebaseapp.com",
@@ -13,7 +13,6 @@ const firebaseConfig = {
   appId: "1:173989173917:web:613693b2c98c4c121e9274"
 };
 
-// Initialize Firebase
 const app = initializeApp(firebaseConfig);
 const db = getDatabase(app);
 
@@ -22,12 +21,13 @@ const commentForm = document.getElementById("commentForm");
 const commentText = document.getElementById("commentText");
 const commentsContainer = document.getElementById("commentsContainer");
 
-// Available reactions
+// Emoji reactions
 const reactions = ["👍", "😂", "😍", "😢", "😮", "😡", "😀"];
 
-// Store comments
+// Local comments array
 let comments = [];
 
+// Submit new comment
 commentForm.addEventListener("submit", (e) => {
   e.preventDefault();
 
@@ -41,11 +41,12 @@ commentForm.addEventListener("submit", (e) => {
     reactions: {},
   };
 
-  comments.unshift(comment);
+  comments.unshift(comment); // newest first
   commentText.value = "";
   renderComments();
 });
 
+// Render all comments
 function renderComments() {
   commentsContainer.innerHTML = "";
 
@@ -55,11 +56,12 @@ function renderComments() {
   }
 
   comments.forEach((comment) => {
-    const commentElement = createCommentElement(comment);
-    commentsContainer.appendChild(commentElement);
+    const element = createCommentElement(comment);
+    commentsContainer.appendChild(element);
   });
 }
 
+// Create a comment or reply element
 function createCommentElement(comment, isReply = false) {
   const box = document.createElement("div");
   box.classList.add(isReply ? "reply-box" : "comment-box");
@@ -68,23 +70,27 @@ function createCommentElement(comment, isReply = false) {
   text.textContent = comment.text;
   box.appendChild(text);
 
-  // Controls
+  // Controls (reply + reactions)
   const controls = document.createElement("div");
   controls.classList.add("controls");
 
-  // Reaction options (left)
+  // Reply button
+  const replyBtn = document.createElement("button");
+  replyBtn.textContent = "💬 Reply";
+  replyBtn.classList.add("reply-btn");
+  controls.appendChild(replyBtn);
+
+  box.appendChild(controls);
+
+  // Reaction options (bottom-right)
   const reactionContainer = document.createElement("div");
   reactionContainer.classList.add("reaction-options");
 
   reactions.forEach((emoji) => {
     const span = document.createElement("span");
-    span.textContent = emoji;
+    const count = comment.reactions[emoji] || 0;
+    span.textContent = count > 0 ? `${emoji} ${count}` : emoji;
     span.classList.add("reaction");
-
-    // Show reaction count if exists
-    if (comment.reactions[emoji]) {
-      span.textContent = `${emoji} ${comment.reactions[emoji]}`;
-    }
 
     span.addEventListener("click", () => {
       comment.reactions[emoji] = (comment.reactions[emoji] || 0) + 1;
@@ -94,15 +100,7 @@ function createCommentElement(comment, isReply = false) {
     reactionContainer.appendChild(span);
   });
 
-  controls.appendChild(reactionContainer);
-
-  // Reply button (right)
-  const replyBtn = document.createElement("button");
-  replyBtn.textContent = "💬 Reply";
-  replyBtn.classList.add("reply-btn");
-  controls.appendChild(replyBtn);
-
-  box.appendChild(controls);
+  box.appendChild(reactionContainer);
 
   // Reply form
   const replyForm = document.createElement("form");
@@ -131,8 +129,8 @@ function createCommentElement(comment, isReply = false) {
     const reply = {
       id: Date.now(),
       text: replyText,
-      reactions: {},
       replies: [],
+      reactions: {},
     };
 
     comment.replies.push(reply);
@@ -141,14 +139,14 @@ function createCommentElement(comment, isReply = false) {
     renderComments();
   });
 
-  // Replies container
+  // Nested replies
   if (comment.replies.length > 0) {
     const repliesDiv = document.createElement("div");
     repliesDiv.classList.add("replies");
 
     comment.replies.forEach((reply) => {
-      const replyElement = createCommentElement(reply, true);
-      repliesDiv.appendChild(replyElement);
+      const replyEl = createCommentElement(reply, true);
+      repliesDiv.appendChild(replyEl);
     });
 
     box.appendChild(repliesDiv);
