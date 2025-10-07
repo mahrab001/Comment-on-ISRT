@@ -1,20 +1,25 @@
-// Import Firebase SDKs (optional for now)
-import { initializeApp } from "https://www.gstatic.com/firebasejs/11.0.1/firebase-app.js";
-import { getDatabase } from "https://www.gstatic.com/firebasejs/11.0.1/firebase-database.js";
+// Import the functions you need from the SDKs you need
+import { initializeApp } from "firebase/app";
+import { getAnalytics } from "firebase/analytics";
+// TODO: Add SDKs for Firebase products that you want to use
+// https://firebase.google.com/docs/web/setup#available-libraries
 
-// Firebase config (can stay unused for now)
+// Your web app's Firebase configuration
+// For Firebase JS SDK v7.20.0 and later, measurementId is optional
 const firebaseConfig = {
   apiKey: "AIzaSyBi0DtNzX0niHbV4LtId7PaxLoD8Pphy6U",
   authDomain: "comment-on-isrt-8a634.firebaseapp.com",
   databaseURL: "https://comment-on-isrt-8a634-default-rtdb.asia-southeast1.firebasedatabase.app",
   projectId: "comment-on-isrt-8a634",
-  storageBucket: "comment-on-isrt-8a634.appspot.com",
+  storageBucket: "comment-on-isrt-8a634.firebasestorage.app",
   messagingSenderId: "173989173917",
-  appId: "1:173989173917:web:613693b2c98c4c121e9274"
+  appId: "1:173989173917:web:613693b2c98c4c121e9274",
+  measurementId: "G-EGLXNG89LT"
 };
 
+// Initialize Firebase
 const app = initializeApp(firebaseConfig);
-const db = getDatabase(app);
+const analytics = getAnalytics(app);
 
 // DOM elements
 const commentForm = document.getElementById("commentForm");
