@@ -1,73 +1,87 @@
-// Import the functions you need from the SDKs you need
-import { initializeApp } from "firebase/app";
-import { getAnalytics } from "firebase/analytics";
-// TODO: Add SDKs for Firebase products that you want to use
-// https://firebase.google.com/docs/web/setup#available-libraries
+// Import Firebase SDKs
+import { initializeApp } from "https://www.gstatic.com/firebasejs/11.0.1/firebase-app.js";
+import {
+  getDatabase,
+  ref,
+  push,
+  onValue,
+  update,
+  set,
+} from "https://www.gstatic.com/firebasejs/11.0.1/firebase-database.js";
 
-// Your web app's Firebase configuration
-// For Firebase JS SDK v7.20.0 and later, measurementId is optional
+// Firebase configuration
 const firebaseConfig = {
   apiKey: "AIzaSyBi0DtNzX0niHbV4LtId7PaxLoD8Pphy6U",
   authDomain: "comment-on-isrt-8a634.firebaseapp.com",
-  databaseURL: "https://comment-on-isrt-8a634-default-rtdb.asia-southeast1.firebasedatabase.app",
+  databaseURL:
+    "https://comment-on-isrt-8a634-default-rtdb.asia-southeast1.firebasedatabase.app",
   projectId: "comment-on-isrt-8a634",
-  storageBucket: "comment-on-isrt-8a634.firebasestorage.app",
+  storageBucket: "comment-on-isrt-8a634.appspot.com",
   messagingSenderId: "173989173917",
   appId: "1:173989173917:web:613693b2c98c4c121e9274",
-  measurementId: "G-EGLXNG89LT"
 };
 
 // Initialize Firebase
 const app = initializeApp(firebaseConfig);
-const analytics = getAnalytics(app);
+const db = getDatabase(app);
 
-// DOM elements
+// DOM Elements
 const commentForm = document.getElementById("commentForm");
 const commentText = document.getElementById("commentText");
 const commentsContainer = document.getElementById("commentsContainer");
 
-// Emoji reactions
+// Reactions
 const reactions = ["👍", "😂", "😍", "😢", "😮", "😡", "😀"];
 
-// Local comments array
-let comments = [];
-
+// =============================
 // Submit new comment
+// =============================
 commentForm.addEventListener("submit", (e) => {
   e.preventDefault();
-
   const text = commentText.value.trim();
   if (!text) return;
 
   const comment = {
-    id: Date.now(),
     text,
+    timestamp: Date.now(),
     replies: [],
     reactions: {},
   };
 
-  comments.unshift(comment); // newest first
+  const commentsRef = ref(db, "comments");
+  push(commentsRef, comment);
   commentText.value = "";
-  renderComments();
 });
 
-// Render all comments
-function renderComments() {
-  commentsContainer.innerHTML = "";
+// =============================
+// Live updates from Firebase
+// =============================
+const commentsRef = ref(db, "comments");
 
-  if (comments.length === 0) {
+onValue(commentsRef, (snapshot) => {
+  commentsContainer.innerHTML = "";
+  const data = snapshot.val();
+
+  if (!data) {
     commentsContainer.innerHTML = "<p>No comments yet. Be the first!</p>";
     return;
   }
+
+  // Convert object to array and sort by newest first
+  const comments = Object.entries(data)
+    .map(([id, comment]) => ({ id, ...comment }))
+    .sort((a, b) => b.timestamp - a.timestamp);
 
   comments.forEach((comment) => {
     const element = createCommentElement(comment);
     commentsContainer.appendChild(element);
   });
-}
+});
 
-// Create a comment or reply element
-function createCommentElement(comment, isReply = false) {
+// =============================
+// Render functions
+// =============================
+function createCommentElement(comment, isReply = false, parentId = null) {
   const box = document.createElement("div");
   box.classList.add(isReply ? "reply-box" : "comment-box");
 
@@ -75,7 +89,7 @@ function createCommentElement(comment, isReply = false) {
   text.textContent = comment.text;
   box.appendChild(text);
 
-  // Controls (reply + reactions)
+  // Controls container
   const controls = document.createElement("div");
   controls.classList.add("controls");
 
@@ -84,22 +98,27 @@ function createCommentElement(comment, isReply = false) {
   replyBtn.textContent = "💬 Reply";
   replyBtn.classList.add("reply-btn");
   controls.appendChild(replyBtn);
-
   box.appendChild(controls);
 
-  // Reaction options (bottom-right)
+  // Reactions container (bottom-right)
   const reactionContainer = document.createElement("div");
   reactionContainer.classList.add("reaction-options");
 
   reactions.forEach((emoji) => {
     const span = document.createElement("span");
-    const count = comment.reactions[emoji] || 0;
+    const count = comment.reactions?.[emoji] || 0;
     span.textContent = count > 0 ? `${emoji} ${count}` : emoji;
     span.classList.add("reaction");
 
     span.addEventListener("click", () => {
-      comment.reactions[emoji] = (comment.reactions[emoji] || 0) + 1;
-      renderComments();
+      const path = parentId
+        ? `comments/${parentId}/replies/${comment.id}/reactions`
+        : `comments/${comment.id}/reactions`;
+
+      const reactionsRef = ref(db, path);
+      const newReactions = { ...comment.reactions };
+      newReactions[emoji] = (newReactions[emoji] || 0) + 1;
+      set(reactionsRef, newReactions);
     });
 
     reactionContainer.appendChild(span);
@@ -132,26 +151,29 @@ function createCommentElement(comment, isReply = false) {
     if (!replyText) return;
 
     const reply = {
-      id: Date.now(),
+      id: Date.now().toString(),
       text: replyText,
+      timestamp: Date.now(),
       replies: [],
       reactions: {},
     };
 
-    comment.replies.push(reply);
+    const repliesRef = ref(db, `comments/${comment.id}/replies`);
+    push(repliesRef, reply);
+
     replyInput.value = "";
     replyForm.style.display = "none";
-    renderComments();
   });
 
-  // Nested replies
-  if (comment.replies.length > 0) {
+  // Render replies
+  if (comment.replies) {
     const repliesDiv = document.createElement("div");
     repliesDiv.classList.add("replies");
 
-    comment.replies.forEach((reply) => {
-      const replyEl = createCommentElement(reply, true);
-      repliesDiv.appendChild(replyEl);
+    Object.entries(comment.replies).forEach(([replyId, reply]) => {
+      repliesDiv.appendChild(
+        createCommentElement({ id: replyId, ...reply }, true, comment.id)
+      );
     });
 
     box.appendChild(repliesDiv);
@@ -159,5 +181,3 @@ function createCommentElement(comment, isReply = false) {
 
   return box;
 }
-
-renderComments();
