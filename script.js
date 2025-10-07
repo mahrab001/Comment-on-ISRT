@@ -110,16 +110,20 @@ function createCommentElement(comment, isReply = false, parentId = null) {
     span.textContent = count > 0 ? `${emoji} ${count}` : emoji;
     span.classList.add("reaction");
 
-    span.addEventListener("click", () => {
-      const path = parentId
-        ? `comments/${parentId}/replies/${comment.id}/reactions`
-        : `comments/${comment.id}/reactions`;
+  span.addEventListener("click", (e) => {
+    e.stopPropagation(); // ✅ prevent triggering reply toggle
 
-      const reactionsRef = ref(db, path);
-      const newReactions = { ...comment.reactions };
-      newReactions[emoji] = (newReactions[emoji] || 0) + 1;
-      set(reactionsRef, newReactions);
-    });
+  const path = parentId
+    ? `comments/${parentId}/replies/${comment.id}/reactions`
+    : `comments/${comment.id}/reactions`;
+
+  const newReactions = { ...comment.reactions };
+  newReactions[emoji] = (newReactions[emoji] || 0) + 1;
+
+  // ✅ Only update reactions in Firebase, not re-render everything
+  set(ref(db, path), newReactions);
+});
+
 
     reactionContainer.appendChild(span);
   });
