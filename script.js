@@ -141,5 +141,20 @@ function showReplyForm(commentId, commentBox) {
   commentBox.appendChild(form);
 }
 
+document.addEventListener('click', (e) => {
+  if (e.target.classList.contains('reaction-option')) {
+    const emoji = e.target.textContent;
+    const container = e.target.closest('.comment-box, .reply-box');
+    let display = container.querySelector('.selected-reaction');
+    if (!display) {
+      display = document.createElement('span');
+      display.classList.add('selected-reaction');
+      container.querySelector('.controls').prepend(display);
+    }
+    display.textContent = emoji;
+  }
+});
+
+
 // Load everything
 loadComments();
