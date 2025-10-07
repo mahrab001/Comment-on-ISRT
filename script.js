@@ -104,11 +104,6 @@ function createCommentElement(comment, isReply = false, parentId = null) {
   controls.classList.add("controls");
 
   // Reply button
-  const replyBtn = document.createElement("button");
-  replyBtn.textContent = "💬 Reply";
-  replyBtn.classList.add("reply-btn");
-  controls.appendChild(replyBtn);
-  box.appendChild(controls);
 
   // ----- Reactions -----
   const reactionContainer = document.createElement("div");
