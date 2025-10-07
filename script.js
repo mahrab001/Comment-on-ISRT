@@ -22,139 +22,139 @@ const commentForm = document.getElementById("commentForm");
 const commentText = document.getElementById("commentText");
 const commentsContainer = document.getElementById("commentsContainer");
 
-// Load comments + replies
-function loadComments() {
-  const commentsRef = ref(db, "comments");
-  onValue(commentsRef, (snapshot) => {
-    const data = snapshot.val();
-    commentsContainer.innerHTML = "";
+// Available reactions
+const reactions = ["👍", "😂", "😍", "😢", "😮", "😡", "😀"];
 
-    if (!data) {
-      commentsContainer.innerHTML = "<p>No comments yet. Be the first!</p>";
-      return;
-    }
+// Store comments
+let comments = [];
 
-    Object.entries(data).forEach(([commentId, comment]) => {
-      const commentBox = createCommentBox(commentId, comment, false);
-      commentsContainer.appendChild(commentBox);
-    });
+commentForm.addEventListener("submit", (e) => {
+  e.preventDefault();
+
+  const text = commentText.value.trim();
+  if (!text) return;
+
+  const comment = {
+    id: Date.now(),
+    text,
+    replies: [],
+    reactions: {},
+  };
+
+  comments.unshift(comment);
+  commentText.value = "";
+  renderComments();
+});
+
+function renderComments() {
+  commentsContainer.innerHTML = "";
+
+  if (comments.length === 0) {
+    commentsContainer.innerHTML = "<p>No comments yet. Be the first!</p>";
+    return;
+  }
+
+  comments.forEach((comment) => {
+    const commentElement = createCommentElement(comment);
+    commentsContainer.appendChild(commentElement);
   });
 }
 
-// Create a comment or reply box
-function createCommentBox(id, data, isReply = false) {
+function createCommentElement(comment, isReply = false) {
   const box = document.createElement("div");
   box.classList.add(isReply ? "reply-box" : "comment-box");
 
   const text = document.createElement("p");
-  text.textContent = data.text;
+  text.textContent = comment.text;
+  box.appendChild(text);
 
+  // Controls
   const controls = document.createElement("div");
   controls.classList.add("controls");
 
-  const likeBtn = document.createElement("button");
-  likeBtn.textContent = `❤️ ${data.likes || 0}`;
-  likeBtn.classList.add("like-btn");
-  likeBtn.onclick = () => reactToPost(id, isReply, data.parentId);
+  // Reaction options (left)
+  const reactionContainer = document.createElement("div");
+  reactionContainer.classList.add("reaction-options");
 
+  reactions.forEach((emoji) => {
+    const span = document.createElement("span");
+    span.textContent = emoji;
+    span.classList.add("reaction");
+
+    // Show reaction count if exists
+    if (comment.reactions[emoji]) {
+      span.textContent = `${emoji} ${comment.reactions[emoji]}`;
+    }
+
+    span.addEventListener("click", () => {
+      comment.reactions[emoji] = (comment.reactions[emoji] || 0) + 1;
+      renderComments();
+    });
+
+    reactionContainer.appendChild(span);
+  });
+
+  controls.appendChild(reactionContainer);
+
+  // Reply button (right)
   const replyBtn = document.createElement("button");
   replyBtn.textContent = "💬 Reply";
   replyBtn.classList.add("reply-btn");
-  if (!isReply) replyBtn.onclick = () => showReplyForm(id, box);
+  controls.appendChild(replyBtn);
 
-  controls.appendChild(likeBtn);
-  if (!isReply) controls.appendChild(replyBtn);
-
-  box.appendChild(text);
   box.appendChild(controls);
 
-  // Add replies if exist
-  if (data.replies) {
-    const repliesContainer = document.createElement("div");
-    repliesContainer.classList.add("replies");
-    Object.entries(data.replies).forEach(([replyId, replyData]) => {
-      const replyBox = createCommentBox(replyId, replyData, true);
-      repliesContainer.appendChild(replyBox);
+  // Reply form
+  const replyForm = document.createElement("form");
+  replyForm.classList.add("reply-form");
+  replyForm.style.display = "none";
+
+  const replyInput = document.createElement("textarea");
+  replyInput.placeholder = "Write a reply...";
+  const replySubmit = document.createElement("button");
+  replySubmit.textContent = "Post Reply";
+
+  replyForm.appendChild(replyInput);
+  replyForm.appendChild(replySubmit);
+  box.appendChild(replyForm);
+
+  replyBtn.addEventListener("click", () => {
+    replyForm.style.display =
+      replyForm.style.display === "none" ? "block" : "none";
+  });
+
+  replyForm.addEventListener("submit", (e) => {
+    e.preventDefault();
+    const replyText = replyInput.value.trim();
+    if (!replyText) return;
+
+    const reply = {
+      id: Date.now(),
+      text: replyText,
+      reactions: {},
+      replies: [],
+    };
+
+    comment.replies.push(reply);
+    replyInput.value = "";
+    replyForm.style.display = "none";
+    renderComments();
+  });
+
+  // Replies container
+  if (comment.replies.length > 0) {
+    const repliesDiv = document.createElement("div");
+    repliesDiv.classList.add("replies");
+
+    comment.replies.forEach((reply) => {
+      const replyElement = createCommentElement(reply, true);
+      repliesDiv.appendChild(replyElement);
     });
-    box.appendChild(repliesContainer);
+
+    box.appendChild(repliesDiv);
   }
 
   return box;
 }
 
-// React (like) feature
-function reactToPost(id, isReply, parentId = null) {
-  let path;
-  if (isReply) {
-    path = `comments/${parentId}/replies/${id}/likes`;
-  } else {
-    path = `comments/${id}/likes`;
-  }
-
-  const likesRef = ref(db, path);
-  update(likesRef, { ".sv": { "increment": 1 } }); // Firebase increment
-}
-
-// Add a new main comment
-commentForm.addEventListener("submit", (e) => {
-  e.preventDefault();
-  const text = commentText.value.trim();
-  if (!text) return;
-
-  const commentsRef = ref(db, "comments");
-  push(commentsRef, {
-    text,
-    timestamp: new Date().toISOString(),
-    likes: 0
-  });
-
-  commentText.value = "";
-});
-
-// Show reply form inline
-function showReplyForm(commentId, commentBox) {
-  if (commentBox.querySelector(".reply-form")) return;
-
-  const form = document.createElement("form");
-  form.classList.add("reply-form");
-  form.innerHTML = `
-    <textarea placeholder="Write a reply..." required></textarea>
-    <button type="submit">Submit Reply</button>
-  `;
-
-  form.addEventListener("submit", (e) => {
-    e.preventDefault();
-    const replyText = form.querySelector("textarea").value.trim();
-    if (!replyText) return;
-
-    const repliesRef = ref(db, `comments/${commentId}/replies`);
-    push(repliesRef, {
-      text: replyText,
-      timestamp: new Date().toISOString(),
-      likes: 0,
-      parentId: commentId
-    });
-
-    form.remove();
-  });
-
-  commentBox.appendChild(form);
-}
-
-document.addEventListener('click', (e) => {
-  if (e.target.classList.contains('reaction-option')) {
-    const emoji = e.target.textContent;
-    const container = e.target.closest('.comment-box, .reply-box');
-    let display = container.querySelector('.selected-reaction');
-    if (!display) {
-      display = document.createElement('span');
-      display.classList.add('selected-reaction');
-      container.querySelector('.controls').prepend(display);
-    }
-    display.textContent = emoji;
-  }
-});
-
-
-// Load everything
-loadComments();
+renderComments();
