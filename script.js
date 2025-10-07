@@ -1,3 +1,96 @@
+// =============================
+// Import Firebase SDKs
+// =============================
+import { initializeApp } from "https://www.gstatic.com/firebasejs/11.0.1/firebase-app.js";
+import {
+  getDatabase,
+  ref,
+  push,
+  onValue,
+  update,
+  set,
+} from "https://www.gstatic.com/firebasejs/11.0.1/firebase-database.js";
+
+// =============================
+// Firebase Configuration
+// =============================
+const firebaseConfig = {
+  apiKey: "AIzaSyBi0DtNzX0niHbV4LtId7PaxLoD8Pphy6U",
+  authDomain: "comment-on-isrt-8a634.firebaseapp.com",
+  databaseURL:
+    "https://comment-on-isrt-8a634-default-rtdb.asia-southeast1.firebasedatabase.app",
+  projectId: "comment-on-isrt-8a634",
+  storageBucket: "comment-on-isrt-8a634.appspot.com",
+  messagingSenderId: "173989173917",
+  appId: "1:173989173917:web:613693b2c98c4c121e9274",
+};
+
+// =============================
+// Initialize Firebase
+// =============================
+const app = initializeApp(firebaseConfig);
+const db = getDatabase(app);
+
+// =============================
+// DOM Elements
+// =============================
+const commentForm = document.getElementById("commentForm");
+const commentText = document.getElementById("commentText");
+const commentsContainer = document.getElementById("commentsContainer");
+
+// =============================
+// Emoji Reactions
+// =============================
+const reactions = ["👍", "😂", "😍", "😢", "😮", "😡", "😀"];
+
+// =============================
+// Submit new comment
+// =============================
+commentForm.addEventListener("submit", (e) => {
+  e.preventDefault();
+  const text = commentText.value.trim();
+  if (!text) return;
+
+  const comment = {
+    text,
+    timestamp: Date.now(),
+    replies: [],
+    reactions: {},
+  };
+
+  const commentsRef = ref(db, "comments");
+  push(commentsRef, comment);
+  commentText.value = "";
+});
+
+// =============================
+// Live updates from Firebase
+// =============================
+const commentsRef = ref(db, "comments");
+
+onValue(commentsRef, (snapshot) => {
+  commentsContainer.innerHTML = "";
+  const data = snapshot.val();
+
+  if (!data) {
+    commentsContainer.innerHTML = "<p>No comments yet. Be the first!</p>";
+    return;
+  }
+
+  // Convert object to array and sort by newest first
+  const comments = Object.entries(data)
+    .map(([id, comment]) => ({ id, ...comment }))
+    .sort((a, b) => b.timestamp - a.timestamp);
+
+  comments.forEach((comment) => {
+    const element = createCommentElement(comment);
+    commentsContainer.appendChild(element);
+  });
+});
+
+// =============================
+// Render Comment / Reply Element
+// =============================
 function createCommentElement(comment, isReply = false, parentId = null) {
   const box = document.createElement("div");
   box.classList.add(isReply ? "reply-box" : "comment-box");
@@ -6,7 +99,7 @@ function createCommentElement(comment, isReply = false, parentId = null) {
   text.textContent = comment.text;
   box.appendChild(text);
 
-  // Controls container
+  // ----- Controls -----
   const controls = document.createElement("div");
   controls.classList.add("controls");
 
@@ -17,7 +110,7 @@ function createCommentElement(comment, isReply = false, parentId = null) {
   controls.appendChild(replyBtn);
   box.appendChild(controls);
 
-  // Reactions container
+  // ----- Reactions -----
   const reactionContainer = document.createElement("div");
   reactionContainer.classList.add("reaction-options");
 
@@ -27,23 +120,22 @@ function createCommentElement(comment, isReply = false, parentId = null) {
     span.textContent = count > 0 ? `${emoji} ${count}` : emoji;
     span.classList.add("reaction");
 
-    // ✅ Fix: Prevent reply form toggle and multiple boxes
     span.addEventListener("click", (e) => {
       e.preventDefault();
-      e.stopPropagation(); // stops from triggering reply toggle or parent click
+      e.stopPropagation(); // ✅ Prevents reply box toggle
 
       const path = parentId
-        ? `comments/${parentId}/replies/${comment.id}/reactions`
-        : `comments/${comment.id}/reactions`;
+        ? `comments/${parentId}/replies/${comment.id}/reactions/${emoji}`
+        : `comments/${comment.id}/reactions/${emoji}`;
 
-      const newReactions = { ...comment.reactions };
-      newReactions[emoji] = (newReactions[emoji] || 0) + 1;
+      // ✅ Update only this emoji count — no overwrite
+      const newCount = (comment.reactions?.[emoji] || 0) + 1;
+      update(ref(db), {
+        [path]: newCount,
+      });
 
-      // ✅ Update Firebase reactions only (not full comment)
-      set(ref(db, path), newReactions);
-
-      // ✅ Update only this emoji’s display instantly
-      span.textContent = `${emoji} ${newReactions[emoji]}`;
+      // ✅ Instant UI update
+      span.textContent = `${emoji} ${newCount}`;
     });
 
     reactionContainer.appendChild(span);
@@ -51,7 +143,7 @@ function createCommentElement(comment, isReply = false, parentId = null) {
 
   box.appendChild(reactionContainer);
 
-  // Reply form
+  // ----- Reply Form -----
   const replyForm = document.createElement("form");
   replyForm.classList.add("reply-form");
   replyForm.style.display = "none";
@@ -65,7 +157,7 @@ function createCommentElement(comment, isReply = false, parentId = null) {
   replyForm.appendChild(replySubmit);
   box.appendChild(replyForm);
 
-  // ✅ Only toggle reply form if clicked directly on the button
+  // Toggle reply form
   replyBtn.addEventListener("click", (e) => {
     e.preventDefault();
     e.stopPropagation();
@@ -73,7 +165,7 @@ function createCommentElement(comment, isReply = false, parentId = null) {
       replyForm.style.display === "none" ? "block" : "none";
   });
 
-  // Handle reply submit
+  // Submit reply
   replyForm.addEventListener("submit", (e) => {
     e.preventDefault();
     const replyText = replyInput.value.trim();
@@ -94,7 +186,7 @@ function createCommentElement(comment, isReply = false, parentId = null) {
     replyForm.style.display = "none";
   });
 
-  // Render replies (recursive)
+  // ----- Render replies recursively -----
   if (comment.replies) {
     const repliesDiv = document.createElement("div");
     repliesDiv.classList.add("replies");
