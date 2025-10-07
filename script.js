@@ -22,10 +22,9 @@ const commentForm = document.getElementById("commentForm");
 const commentText = document.getElementById("commentText");
 const commentsContainer = document.getElementById("commentsContainer");
 
-// Function to load and display comments
+// Load comments (with replies)
 function loadComments() {
   const commentsRef = ref(db, "comments");
-
   onValue(commentsRef, (snapshot) => {
     const data = snapshot.val();
     commentsContainer.innerHTML = "";
@@ -35,23 +34,62 @@ function loadComments() {
       return;
     }
 
-    // Convert data object to array
-    const commentsArray = Object.values(data).sort(
-      (a, b) => new Date(b.timestamp) - new Date(a.timestamp)
+    // Convert to array and sort newest first
+    const commentsArray = Object.entries(data).sort(
+      (a, b) => new Date(b[1].timestamp) - new Date(a[1].timestamp)
     );
 
-    commentsArray.forEach((comment) => {
-      const div = document.createElement("div");
-      div.classList.add("comment");
+    commentsArray.forEach(([commentId, comment]) => {
+      const commentDiv = document.createElement("div");
+      commentDiv.classList.add("comment");
+
       const date = new Date(comment.timestamp);
-      const formatted = `${date.toLocaleDateString()} at ${date.toLocaleTimeString()}`;
-      div.innerHTML = `<p>${comment.text}</p><small>Posted anonymously on ${formatted}</small>`;
-      commentsContainer.appendChild(div);
+      const formattedDate =
+        date.toLocaleDateString() + " at " + date.toLocaleTimeString();
+
+      commentDiv.innerHTML = `
+        <p>${comment.text}</p>
+        <small>Posted Anonymously on ${formattedDate}</small>
+        <button class="reply-btn" data-id="${commentId}">💬 Reply</button>
+        <div class="replies"></div>
+      `;
+
+      // Add replies if they exist
+      const repliesDiv = commentDiv.querySelector(".replies");
+      if (comment.replies) {
+        const repliesArray = Object.values(comment.replies).sort(
+          (a, b) => new Date(a.timestamp) - new Date(b.timestamp)
+        );
+        repliesArray.forEach((reply) => {
+          const replyDiv = document.createElement("div");
+          replyDiv.classList.add("reply");
+          const replyDate = new Date(reply.timestamp);
+          const formattedReplyDate =
+            replyDate.toLocaleDateString() +
+            " at " +
+            replyDate.toLocaleTimeString();
+          replyDiv.innerHTML = `
+            <p>${reply.text}</p>
+            <small>Replied on ${formattedReplyDate}</small>
+          `;
+          repliesDiv.appendChild(replyDiv);
+        });
+      }
+
+      commentsContainer.appendChild(commentDiv);
+    });
+
+    // Add reply button functionality
+    document.querySelectorAll(".reply-btn").forEach((btn) => {
+      btn.addEventListener("click", (e) => {
+        const commentId = e.target.getAttribute("data-id");
+        showReplyForm(commentId, e.target);
+      });
     });
   });
 }
 
-// Handle new comment submission
+// Add a new main comment
 commentForm.addEventListener("submit", (e) => {
   e.preventDefault();
   const text = commentText.value.trim();
@@ -66,5 +104,34 @@ commentForm.addEventListener("submit", (e) => {
   commentText.value = "";
 });
 
-// Load comments when page opens
+// Show inline reply form
+function showReplyForm(commentId, replyButton) {
+  // Prevent multiple reply forms
+  if (replyButton.nextElementSibling?.classList.contains("reply-form")) return;
+
+  const form = document.createElement("form");
+  form.classList.add("reply-form");
+  form.innerHTML = `
+    <textarea placeholder="Write your reply..." required></textarea>
+    <button type="submit">Submit Reply</button>
+  `;
+
+  replyButton.insertAdjacentElement("afterend", form);
+
+  form.addEventListener("submit", (e) => {
+    e.preventDefault();
+    const text = form.querySelector("textarea").value.trim();
+    if (!text) return;
+
+    const replyRef = ref(db, `comments/${commentId}/replies`);
+    push(replyRef, {
+      text,
+      timestamp: new Date().toISOString()
+    });
+
+    form.remove(); // Hide the form after submission
+  });
+}
+
+// Load comments on page start
 loadComments();
